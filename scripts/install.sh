@@ -992,6 +992,8 @@ setup_venv() {
     fi
 
     # uv creates the venv and pins the Python version in one step
+    # Explicitly specify the venv path to avoid .venv vs venv confusion
+    # This ensures uv sync also installs to the same location
     $UV_CMD venv venv --python "$PYTHON_VERSION"
 
     log_success "Virtual environment ready (Python $PYTHON_VERSION)"
@@ -1131,6 +1133,12 @@ install_deps() {
         # uv's own progress UI handles TTY detection and downgrades
         # gracefully when stdout/stderr aren't terminals.
         if UV_PROJECT_ENVIRONMENT="$INSTALL_DIR/venv" $UV_CMD sync --extra all --locked; then
+            # Verify packages were installed to venv (not .venv)
+            if [ ! -d "$INSTALL_DIR/venv/lib" ] && [ -d "$INSTALL_DIR/.venv/lib" ]; then
+                log_warn "Packages installed to .venv instead of venv — fixing..."
+                rm -rf "$INSTALL_DIR/venv"
+                mv "$INSTALL_DIR/.venv" "$INSTALL_DIR/venv"
+            fi
             log_success "Main package installed (hash-verified via uv.lock)"
             log_success "All dependencies installed"
             return 0
